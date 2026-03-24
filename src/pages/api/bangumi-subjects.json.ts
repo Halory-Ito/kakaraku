@@ -156,7 +156,7 @@ export const GET: APIRoute = async () => {
 		return new Response(JSON.stringify({ anime, manga }), {
 			headers: {
 				"Content-Type": "application/json; charset=utf-8",
-				"Cache-Control": "public, max-age=1800",
+				"Cache-Control": "no-store",
 			},
 		});
 	} catch (error) {

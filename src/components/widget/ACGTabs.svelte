@@ -114,7 +114,9 @@ async function loadSteamGames() {
 	loadingGames = true;
 	gameError = "";
 	try {
-		const response = await fetch(`/api/steam-games.json?steamId=${encodeURIComponent(steamId)}`);
+		const response = await fetch(`/api/steam-games.json?steamId=${encodeURIComponent(steamId)}`, {
+			cache: "no-store",
+		});
 		if (!response.ok) {
 			const errData = (await response.json().catch(() => null)) as { error?: string } | null;
 			throw new Error(errData?.error || `Steam API failed: ${response.status}`);
@@ -140,7 +142,9 @@ async function loadBangumiSubjects() {
 	loadingBangumi = true;
 	bangumiError = "";
 	try {
-		const response = await fetch("/api/bangumi-subjects.json");
+		const response = await fetch("/api/bangumi-subjects.json", {
+			cache: "no-store",
+		});
 		if (!response.ok) {
 			throw new Error(`Bangumi API failed: ${response.status}`);
 		}

@@ -91,7 +91,7 @@ export const GET: APIRoute = async ({ url }) => {
 		return new Response(JSON.stringify({ games }), {
 			headers: {
 				"Content-Type": "application/json; charset=utf-8",
-				"Cache-Control": "public, max-age=1800",
+				"Cache-Control": "no-store",
 			},
 		});
 	} catch (error) {
