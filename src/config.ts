@@ -60,6 +60,7 @@ export const navBarConfig: NavBarConfig = {
 	links: [
 		LinkPreset.Home,
 		LinkPreset.Archive,
+		LinkPreset.ACG,
 		LinkPreset.About,
 		LinkPreset.Friends,
 		{
@@ -116,3 +117,10 @@ export const expressiveCodeConfig: ExpressiveCodeConfig = {
 	// Please select a dark theme, as this blog theme currently only supports dark background color
 	theme: "github-dark",
 };
+
+
+export const agcConfig = {
+	steamId: '76561199326443732',
+	bangumiUserId: '1077797',
+	bangumiUsername: 'karaku'
+}

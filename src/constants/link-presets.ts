@@ -7,6 +7,11 @@ export const LinkPresets: { [key in LinkPreset]: NavBarLink } = {
 		name: i18n(I18nKey.home),
 		url: "/",
 	},
+	[LinkPreset.ACG]: {
+		name: i18n(I18nKey.acg),
+		url: "/acg/",
+		icon: "material-symbols:auto-awesome-motion-outline",
+	},
 	[LinkPreset.About]: {
 		name: i18n(I18nKey.about),
 		url: "/about/",
