@@ -1,6 +1,8 @@
 import { agcConfig } from "@/config";
 import type { APIRoute } from "astro";
 
+export const prerender = false;
+
 type SteamOwnedGame = {
 	appid: number;
 	name?: string;
