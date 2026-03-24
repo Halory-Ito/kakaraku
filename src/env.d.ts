@@ -2,6 +2,4 @@
 /// <reference path="../.astro/types.d.ts" />
 
 interface ImportMetaEnv {
-	readonly STEAM_API_KEY?: string;
-	readonly VNDB_API_KEY?: string;
 }

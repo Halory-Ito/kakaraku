@@ -120,7 +120,7 @@ export const expressiveCodeConfig: ExpressiveCodeConfig = {
 
 
 export const agcConfig = {
-	steamId: '76561199326443732',
+	vndbUserId: 'u335444',
 	bangumiUserId: '1077797',
 	bangumiUsername: 'karaku'
 }

@@ -2,7 +2,6 @@
 import { getEntry, render } from "astro:content";
 import Markdown from "@components/misc/Markdown.astro";
 import ACGTabs from "@components/widget/ACGTabs.svelte";
-import { agcConfig } from "@/config";
 import I18nKey from "../i18n/i18nKey";
 import { i18n } from "../i18n/translation";
 import MainGridLayout from "../layouts/MainGridLayout.astro";
@@ -15,62 +14,6 @@ if (!acgPost) {
 
 const { Content } = await render(acgPost);
 
-type ACGCard = {
-	title: string;
-	comment: string;
-	status: string;
-	icon: string;
-	cover: string;
-};
-
-const animeCards: ACGCard[] = [
-	{
-		title: "葬送的芙莉莲",
-		comment: "氛围安静但不无聊，适合反复回看。",
-		status: "重温中",
-		icon: "material-symbols:live-tv-outline-rounded",
-		cover: "https://dummyimage.com/640x360/2f3e57/ffffff&text=Anime",
-	},
-	{
-		title: "迷宫饭",
-		comment: "设定脑洞很大，日常和冒险节奏平衡得很好。",
-		status: "追番中",
-		icon: "material-symbols:live-tv-outline-rounded",
-		cover: "https://dummyimage.com/640x360/4b5d3f/ffffff&text=Anime",
-	},
-	{
-		title: "孤独摇滚",
-		comment: "分镜和演出很有记忆点，音乐也很抓耳。",
-		status: "已看完",
-		icon: "material-symbols:live-tv-outline-rounded",
-		cover: "https://dummyimage.com/640x360/8b3d5b/ffffff&text=Anime",
-	},
-];
-
-const mangaCards: ACGCard[] = [
-	{
-		title: "我内心的糟糕念头",
-		comment: "人物成长细腻，情感推进自然。",
-		status: "连载跟进",
-		icon: "material-symbols:menu-book-outline-rounded",
-		cover: "https://dummyimage.com/640x360/4d3f6b/ffffff&text=Manga",
-	},
-	{
-		title: "蓦然回首",
-		comment: "短篇但冲击力很强，读完后会想很久。",
-		status: "已读",
-		icon: "material-symbols:menu-book-outline-rounded",
-		cover: "https://dummyimage.com/640x360/3d5a73/ffffff&text=Manga",
-	},
-	{
-		title: "跃动青春",
-		comment: "群像关系舒服，日常描写很有温度。",
-		status: "补档中",
-		icon: "material-symbols:menu-book-outline-rounded",
-		cover: "https://dummyimage.com/640x360/2f5f6e/ffffff&text=Manga",
-	},
-];
-
 ---
 <MainGridLayout title={i18n(I18nKey.acg)} description={i18n(I18nKey.acg)}>
 	<div class="flex w-full rounded-[var(--radius-large)] overflow-hidden relative min-h-32">
@@ -78,7 +21,7 @@ const mangaCards: ACGCard[] = [
 			<Markdown class="mt-2">
 				<Content />
 			</Markdown>
-			<ACGTabs client:only="svelte" animeCards={animeCards} mangaCards={mangaCards} steamId={agcConfig.steamId} />
+			<ACGTabs client:only="svelte" />
 		</div>
 	</div>
 </MainGridLayout>

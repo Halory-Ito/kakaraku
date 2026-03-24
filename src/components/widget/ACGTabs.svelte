@@ -24,7 +24,6 @@ type GameItem = {
 
 export let animeCards: AcgCard[] = [];
 export let mangaCards: AcgCard[] = [];
-export let steamId = "";
 
 const tabs = [
 	{ key: "anime", label: "动画", icon: "material-symbols:live-tv-outline-rounded" },
@@ -33,6 +32,7 @@ const tabs = [
 ] as const;
 
 type TabKey = (typeof tabs)[number]["key"];
+const skeletonItems = [0, 1, 2, 3, 4, 5];
 
 const pageSize = 6;
 let activeTab: TabKey = "anime";
@@ -111,16 +111,16 @@ function getTagClass(tag: string): string {
 	return "bg-[var(--primary)]/10 text-[var(--primary)]";
 }
 
-async function loadSteamGames() {
+async function loadVndbGames() {
 	loadingGames = true;
 	gameError = "";
 	try {
-		const response = await fetch(`/api/steam-games.json?steamId=${encodeURIComponent(steamId)}`, {
+		const response = await fetch("/api/vndb-games.json", {
 			cache: "no-store",
 		});
 		if (!response.ok) {
 			const errData = (await response.json().catch(() => null)) as { error?: string } | null;
-			throw new Error(errData?.error || `Steam API failed: ${response.status}`);
+			throw new Error(errData?.error || `VNDB API failed: ${response.status}`);
 		}
 		const data = (await response.json()) as { games: GameItem[]; error?: string };
 		if (data.error) {
@@ -132,7 +132,7 @@ async function loadSteamGames() {
 		if (error instanceof Error) {
 			gameError = `游戏数据加载失败：${error.message}`;
 		} else {
-			gameError = "游戏数据加载失败，请确认 Steam/VNDB 配置可用。";
+			gameError = "游戏数据加载失败，请确认 VNDB 配置可用。";
 		}
 	} finally {
 		loadingGames = false;
@@ -161,7 +161,7 @@ async function loadBangumiSubjects() {
 }
 
 onMount(() => {
-	loadSteamGames();
+	loadVndbGames();
 	loadBangumiSubjects();
 });
 </script>
@@ -182,10 +182,22 @@ onMount(() => {
 		{/each}
 	</div>
 
-	{#if activeTab === "game" && loadingGames}
-		<div class="text-sm text-black/60 dark:text-white/60">正在加载游戏数据（Steam / VNDB）...</div>
-	{:else if (activeTab === "anime" || activeTab === "manga") && loadingBangumi}
-		<div class="text-sm text-black/60 dark:text-white/60">正在加载 Bangumi 条目数据...</div>
+	{#if (activeTab === "game" && loadingGames) || ((activeTab === "anime" || activeTab === "manga") && loadingBangumi)}
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4" aria-label="加载骨架">
+			{#each skeletonItems as item}
+				<article class="rounded-[var(--radius-large)] border border-black/10 dark:border-white/10 bg-white/60 dark:bg-white/5 p-5 animate-pulse">
+					<div class="mb-3 rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 aspect-[3/4]"></div>
+					<div class="space-y-3">
+						<div class="h-6 w-3/4 rounded bg-black/10 dark:bg-white/10"></div>
+						<div class="flex flex-wrap gap-2">
+							<div class="h-6 w-24 rounded-full bg-black/10 dark:bg-white/10"></div>
+							<div class="h-6 w-20 rounded-full bg-black/10 dark:bg-white/10"></div>
+							<div class="h-6 w-16 rounded-full bg-black/10 dark:bg-white/10"></div>
+						</div>
+					</div>
+				</article>
+			{/each}
+		</div>
 	{:else if activeTab === "game" && gameError}
 		<div class="text-sm text-red-500">{gameError}</div>
 	{:else if (activeTab === "anime" || activeTab === "manga") && bangumiError && activeSource.length === 0}
@@ -195,14 +207,13 @@ onMount(() => {
 	{:else}
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 			{#each pagedCards as card}
-				{@const isGameCard = card.icon === "fa6-brands:steam"}
 				<article class="rounded-[var(--radius-large)] border border-black/10 dark:border-white/10 bg-white/60 dark:bg-white/5 p-5 transition hover:shadow-md hover:-translate-y-0.5">
 					{#if card.cover}
 						<div class="mb-3 rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
 							<img
 								src={card.cover}
 								alt={`${card.title} cover`}
-								class={`w-full ${isGameCard ? "aspect-video object-cover" : "aspect-[3/4] object-cover bg-black/10 dark:bg-white/10"}`}
+								class="w-full aspect-[3/4] object-cover bg-black/10 dark:bg-white/10"
 								loading="lazy"
 							/>
 						</div>
