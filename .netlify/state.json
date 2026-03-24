@@ -1,0 +1,19 @@
+{
+	"geolocation": {
+		"data": {
+			"city": "Shangrao",
+			"country": {
+				"code": "CN",
+				"name": "China"
+			},
+			"subdivision": {
+				"code": "JX",
+				"name": "Jiangxi"
+			},
+			"timezone": "Asia/Shanghai",
+			"latitude": 28.4527,
+			"longitude": 117.9451
+		},
+		"timestamp": 1774358780609
+	}
+}
