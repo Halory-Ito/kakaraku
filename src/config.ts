@@ -7,6 +7,23 @@ import type {
 } from "./types/config";
 import { LinkPreset } from "./types/config";
 
+export const friendsConfig = [
+	{
+    title: 'lvy',
+    imgurl: 'https://lvyovo-wiki.tech/images/avatar.png',
+    desc: '很强的小姐姐，Web全栈、AI、算法都会，知识区UP养成中',
+    siteurl: 'https://lvyovo-wiki.tech',
+    tags: ['Web全栈', 'AI', '算法'],
+	},
+	{
+    title: 'feitwnd',
+    imgurl: 'https://feitwnd.oss-cn-shanghai.aliyuncs.com/image/avatar.png',
+    desc: '工作室学弟，学习能力很强，至少比当年的我强',
+    siteurl: 'https://blog.feitwnd.cc',
+    tags: ['Web全栈'],
+	},
+]
+
 export const siteConfig: SiteConfig = {
 	title: "Kakaraku",
 	subtitle: "^_^",
@@ -44,6 +61,7 @@ export const navBarConfig: NavBarConfig = {
 		LinkPreset.Home,
 		LinkPreset.Archive,
 		LinkPreset.About,
+		LinkPreset.Friends,
 		{
 			name: "GitHub",
 			url: "https://github.com/Halory-Ito/kakaraku", // Internal links should not include the base path, as it is automatically added
