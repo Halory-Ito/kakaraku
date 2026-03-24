@@ -11,10 +11,12 @@ type AcgCard = {
 	link?: string;
 };
 
-type SteamGame = {
-	appid: number;
+type GameItem = {
+	id: string;
 	name: string;
 	playtimeMinutes: number;
+	status?: string;
+	source?: "steam" | "vndb";
 	url: string;
 	coverUrl?: string;
 	iconUrl: string;
@@ -75,12 +77,16 @@ function playtimeToStatus(minutes: number): string {
 	return `游玩 ${hours.toFixed(1)} 小时`;
 }
 
-function toGameCard(game: SteamGame): AcgCard {
+function toGameCard(game: GameItem): AcgCard {
+	const sourceIcon = game.source === "vndb"
+		? "material-symbols:stadia-controller-outline-rounded"
+		: "fa6-brands:steam";
+
 	return {
 		title: game.name,
 		comment: "",
-		status: playtimeToStatus(game.playtimeMinutes),
-		icon: "fa6-brands:steam",
+		status: game.status || playtimeToStatus(game.playtimeMinutes),
+		icon: sourceIcon,
 		cover: game.coverUrl || game.iconUrl,
 	};
 }
@@ -106,11 +112,6 @@ function getTagClass(tag: string): string {
 }
 
 async function loadSteamGames() {
-	if (!steamId) {
-		gameError = "未配置 Steam ID";
-		return;
-	}
-
 	loadingGames = true;
 	gameError = "";
 	try {
@@ -121,7 +122,7 @@ async function loadSteamGames() {
 			const errData = (await response.json().catch(() => null)) as { error?: string } | null;
 			throw new Error(errData?.error || `Steam API failed: ${response.status}`);
 		}
-		const data = (await response.json()) as { games: SteamGame[]; error?: string };
+		const data = (await response.json()) as { games: GameItem[]; error?: string };
 		if (data.error) {
 			throw new Error(data.error);
 		}
@@ -129,9 +130,9 @@ async function loadSteamGames() {
 	} catch (error) {
 		console.error(error);
 		if (error instanceof Error) {
-			gameError = `Steam 数据加载失败：${error.message}`;
+			gameError = `游戏数据加载失败：${error.message}`;
 		} else {
-			gameError = "Steam 数据加载失败，请确认个人资料公开可见。";
+			gameError = "游戏数据加载失败，请确认 Steam/VNDB 配置可用。";
 		}
 	} finally {
 		loadingGames = false;
@@ -182,7 +183,7 @@ onMount(() => {
 	</div>
 
 	{#if activeTab === "game" && loadingGames}
-		<div class="text-sm text-black/60 dark:text-white/60">正在加载 Steam 游戏数据...</div>
+		<div class="text-sm text-black/60 dark:text-white/60">正在加载游戏数据（Steam / VNDB）...</div>
 	{:else if (activeTab === "anime" || activeTab === "manga") && loadingBangumi}
 		<div class="text-sm text-black/60 dark:text-white/60">正在加载 Bangumi 条目数据...</div>
 	{:else if activeTab === "game" && gameError}
