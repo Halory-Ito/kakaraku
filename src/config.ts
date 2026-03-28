@@ -9,20 +9,20 @@ import { LinkPreset } from "./types/config";
 
 export const friendsConfig = [
 	{
-    title: 'lvy',
-    imgurl: 'https://lvyovo-wiki.tech/images/avatar.png',
-    desc: '很强的小姐姐，Web全栈、AI、算法都会，知识区UP养成中',
-    siteurl: 'https://lvyovo-wiki.tech',
-    tags: ['Web全栈', 'AI', '算法'],
+		title: "lvy",
+		imgurl: "https://lvyovo-wiki.tech/images/avatar.png",
+		desc: "很强的小姐姐，Web全栈、AI、算法都会，知识区UP养成中",
+		siteurl: "https://lvyovo-wiki.tech",
+		tags: ["Web全栈", "AI", "算法"],
 	},
 	{
-    title: 'feitwnd',
-    imgurl: 'https://feitwnd.oss-cn-shanghai.aliyuncs.com/image/avatar.png',
-    desc: '工作室学弟，学习能力很强，至少比当年的我强',
-    siteurl: 'https://blog.feitwnd.cc',
-    tags: ['Web全栈'],
+		title: "feitwnd",
+		imgurl: "https://avatars.githubusercontent.com/u/195735767?v=4",
+		desc: "二次元浓度较高的Web全栈开发者",
+		siteurl: "https://blog.feitwnd.cc",
+		tags: ["Web全栈"],
 	},
-]
+];
 
 export const siteConfig: SiteConfig = {
 	title: "Kakaraku",
@@ -63,11 +63,11 @@ export const navBarConfig: NavBarConfig = {
 		LinkPreset.ACG,
 		LinkPreset.About,
 		LinkPreset.Friends,
-		{
-			name: "GitHub",
-			url: "https://github.com/Halory-Ito/kakaraku", // Internal links should not include the base path, as it is automatically added
-			external: true, // Show an external link icon and will open in a new tab
-		},
+		// {
+		// 	name: "GitHub",
+		// 	url: "https://github.com/Halory-Ito/kakaraku", // Internal links should not include the base path, as it is automatically added
+		// 	external: true, // Show an external link icon and will open in a new tab
+		// },
 	],
 };
 
@@ -118,9 +118,8 @@ export const expressiveCodeConfig: ExpressiveCodeConfig = {
 	theme: "github-dark",
 };
 
-
 export const agcConfig = {
-	vndbUserId: 'u335444',
-	bangumiUserId: '1077797',
-	bangumiUsername: 'karaku'
-}
+	vndbUserId: "u335444",
+	bangumiUserId: "1077797",
+	bangumiUsername: "karaku",
+};

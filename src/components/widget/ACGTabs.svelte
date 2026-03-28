@@ -1,6 +1,6 @@
 <script lang="ts">
-import { onMount } from "svelte";
 import Icon from "@iconify/svelte";
+import { onMount } from "svelte";
 
 type AcgCard = {
 	title: string;
@@ -26,12 +26,25 @@ export let animeCards: AcgCard[] = [];
 export let mangaCards: AcgCard[] = [];
 
 const tabs = [
-	{ key: "anime", label: "动画", icon: "material-symbols:live-tv-outline-rounded" },
-	{ key: "manga", label: "漫画", icon: "material-symbols:menu-book-outline-rounded" },
-	{ key: "game", label: "游戏", icon: "material-symbols:sports-esports-outline-rounded" },
+	{
+		key: "anime",
+		label: "动画",
+		icon: "material-symbols:live-tv-outline-rounded",
+	},
+	{
+		key: "manga",
+		label: "漫画",
+		icon: "material-symbols:menu-book-outline-rounded",
+	},
+	{
+		key: "game",
+		label: "游戏",
+		icon: "material-symbols:sports-esports-outline-rounded",
+	},
 ] as const;
 
 type TabKey = (typeof tabs)[number]["key"];
+type SortOrder = "asc" | "desc";
 const skeletonItems = [0, 1, 2, 3, 4, 5];
 
 const pageSize = 6;
@@ -46,13 +59,65 @@ let gameError = "";
 let loadingBangumi = false;
 let bangumiError = "";
 
-$: resolvedAnimeCards = bangumiAnimeCards.length > 0 ? bangumiAnimeCards : animeCards;
-$: resolvedMangaCards = bangumiMangaCards.length > 0 ? bangumiMangaCards : mangaCards;
-$: activeSource = activeTab === "anime" ? resolvedAnimeCards : activeTab === "manga" ? resolvedMangaCards : gameCards;
-$: totalPages = Math.max(1, Math.ceil(activeSource.length / pageSize));
+let keywordByTab: Record<TabKey, string> = {
+	anime: "",
+	manga: "",
+	game: "",
+};
+
+let selectedStatusByTab: Record<TabKey, string> = {
+	anime: "all",
+	manga: "all",
+	game: "all",
+};
+
+let sortOrderByTab: Record<TabKey, SortOrder> = {
+	anime: "asc",
+	manga: "asc",
+	game: "asc",
+};
+
+$: resolvedAnimeCards =
+	bangumiAnimeCards.length > 0 ? bangumiAnimeCards : animeCards;
+$: resolvedMangaCards =
+	bangumiMangaCards.length > 0 ? bangumiMangaCards : mangaCards;
+$: activeSource =
+	activeTab === "anime"
+		? resolvedAnimeCards
+		: activeTab === "manga"
+			? resolvedMangaCards
+			: gameCards;
+$: activeKeyword = keywordByTab[activeTab].trim().toLowerCase();
+$: activeKeywordTokens = activeKeyword.split(/\s+/).filter(Boolean);
+$: activeSelectedStatus = selectedStatusByTab[activeTab];
+$: activeSortOrder = sortOrderByTab[activeTab];
+$: statusOptions = Array.from(
+	new Set(
+		activeSource
+			.map((card) => getCardStatusValue(card))
+			.filter((value) => value.length > 0),
+	),
+);
+$: filteredCards = activeSource.filter((card) => {
+	const searchText = getCardSearchText(card);
+	const keywordMatch =
+		activeKeywordTokens.length === 0 ||
+		activeKeywordTokens.every((token) => searchText.includes(token));
+
+	const statusMatch =
+		activeSelectedStatus === "all" ||
+		getCardStatusValue(card) === activeSelectedStatus;
+
+	return keywordMatch && statusMatch;
+});
+$: sortedCards = [...filteredCards].sort((a, b) => {
+	const direction = activeSortOrder === "asc" ? 1 : -1;
+	return direction * a.title.localeCompare(b.title, "zh-Hans-CN");
+});
+$: totalPages = Math.max(1, Math.ceil(sortedCards.length / pageSize));
 $: currentPage = Math.min(currentPage, totalPages);
 $: start = (currentPage - 1) * pageSize;
-$: pagedCards = activeSource.slice(start, start + pageSize);
+$: pagedCards = sortedCards.slice(start, start + pageSize);
 
 function switchTab(tab: TabKey) {
 	if (activeTab === tab) return;
@@ -63,6 +128,28 @@ function switchTab(tab: TabKey) {
 function goToPage(page: number) {
 	if (page < 1 || page > totalPages) return;
 	currentPage = page;
+}
+
+function updateKeyword(value: string) {
+	keywordByTab[activeTab] = value;
+	keywordByTab = { ...keywordByTab };
+	currentPage = 1;
+}
+
+function updateSelectedStatus(value: string) {
+	selectedStatusByTab[activeTab] = value;
+	selectedStatusByTab = { ...selectedStatusByTab };
+	currentPage = 1;
+}
+
+function updateSortOrder(value: SortOrder) {
+	sortOrderByTab[activeTab] = value;
+	sortOrderByTab = { ...sortOrderByTab };
+	currentPage = 1;
+}
+
+function getSortLabel(order: SortOrder): string {
+	return order === "asc" ? "标题升序" : "标题降序";
 }
 
 function playtimeToStatus(minutes: number): string {
@@ -78,9 +165,10 @@ function playtimeToStatus(minutes: number): string {
 }
 
 function toGameCard(game: GameItem): AcgCard {
-	const sourceIcon = game.source === "vndb"
-		? "material-symbols:stadia-controller-outline-rounded"
-		: "fa6-brands:steam";
+	const sourceIcon =
+		game.source === "vndb"
+			? "material-symbols:stadia-controller-outline-rounded"
+			: "fa6-brands:steam";
 
 	return {
 		title: game.name,
@@ -89,6 +177,63 @@ function toGameCard(game: GameItem): AcgCard {
 		icon: sourceIcon,
 		cover: game.coverUrl || game.iconUrl,
 	};
+}
+
+function getCardStatusValue(card: AcgCard): string {
+	const statusTags = card.status
+		.split(" · ")
+		.map((item) => item.trim())
+		.filter(Boolean);
+
+	const preferredStates = [
+		"在看",
+		"想看",
+		"看过",
+		"搁置",
+		"抛弃",
+		"收藏",
+		"在读",
+		"想读",
+		"读过",
+		"在玩",
+		"想玩",
+		"玩过",
+		"通关",
+		"未游玩",
+	];
+
+	const matched = statusTags.find((tag) =>
+		preferredStates.some((state) => tag.includes(state)),
+	);
+
+	if (matched) {
+		return matched;
+	}
+
+	if (statusTags.length > 0) {
+		return statusTags[0];
+	}
+
+	return "未分类";
+}
+
+function getCardSearchText(card: AcgCard): string {
+	const statusTags = card.status
+		.split(" · ")
+		.map((item) => item.trim())
+		.filter(Boolean)
+		.join(" ");
+
+	return [
+		card.title,
+		card.comment,
+		card.status,
+		statusTags,
+		getCardStatusValue(card),
+		card.link || "",
+	]
+		.join(" ")
+		.toLowerCase();
 }
 
 function getTagClass(tag: string): string {
@@ -100,11 +245,23 @@ function getTagClass(tag: string): string {
 		return "bg-violet-500/15 text-violet-600 dark:text-violet-300";
 	}
 
-	if (tag.includes("/") || tag.includes("话") || tag.includes("卷") || tag.includes("章")) {
+	if (
+		tag.includes("/") ||
+		tag.includes("话") ||
+		tag.includes("卷") ||
+		tag.includes("章")
+	) {
 		return "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300";
 	}
 
-	if (tag.includes("在看") || tag.includes("想看") || tag.includes("看过") || tag.includes("搁置") || tag.includes("抛弃") || tag.includes("收藏")) {
+	if (
+		tag.includes("在看") ||
+		tag.includes("想看") ||
+		tag.includes("看过") ||
+		tag.includes("搁置") ||
+		tag.includes("抛弃") ||
+		tag.includes("收藏")
+	) {
 		return "bg-amber-500/15 text-amber-600 dark:text-amber-300";
 	}
 
@@ -119,10 +276,15 @@ async function loadVndbGames() {
 			cache: "no-store",
 		});
 		if (!response.ok) {
-			const errData = (await response.json().catch(() => null)) as { error?: string } | null;
+			const errData = (await response.json().catch(() => null)) as {
+				error?: string;
+			} | null;
 			throw new Error(errData?.error || `VNDB API failed: ${response.status}`);
 		}
-		const data = (await response.json()) as { games: GameItem[]; error?: string };
+		const data = (await response.json()) as {
+			games: GameItem[];
+			error?: string;
+		};
 		if (data.error) {
 			throw new Error(data.error);
 		}
@@ -149,7 +311,10 @@ async function loadBangumiSubjects() {
 		if (!response.ok) {
 			throw new Error(`Bangumi API failed: ${response.status}`);
 		}
-		const data = (await response.json()) as { anime: AcgCard[]; manga: AcgCard[] };
+		const data = (await response.json()) as {
+			anime: AcgCard[];
+			manga: AcgCard[];
+		};
 		bangumiAnimeCards = data.anime || [];
 		bangumiMangaCards = data.manga || [];
 	} catch (error) {
@@ -182,6 +347,63 @@ onMount(() => {
 		{/each}
 	</div>
 
+	<div class="card-base mb-5 border border-[var(--line-divider)] p-4 md:p-5 space-y-4">
+		<label class="flex flex-col gap-1.5 text-sm">
+			<span class="text-75 font-semibold">关键字搜索</span>
+			<input
+				type="text"
+				value={keywordByTab[activeTab]}
+				on:input={(event) =>
+					updateKeyword((event.currentTarget as HTMLInputElement).value)}
+				placeholder="搜索标题、状态、标签、备注"
+				class="h-10 rounded-lg px-3 border border-[var(--line-divider)] bg-[var(--btn-plain-bg-hover)] text-75 placeholder:text-black/35 dark:placeholder:text-white/35 outline-none focus:ring-2 focus:ring-[var(--primary)]/35"
+			/>
+		</label>
+
+		<div class="space-y-1.5">
+			<div class="text-75 text-sm font-semibold">状态筛选</div>
+			<div class="flex flex-wrap gap-2">
+				<button
+					type="button"
+					on:click={() => updateSelectedStatus("all")}
+					class="btn-plain rounded-lg h-9 px-3 text-sm font-semibold active:scale-95"
+					class:bg-[var(--btn-plain-bg-hover)]={selectedStatusByTab[activeTab] === "all"}
+					aria-pressed={selectedStatusByTab[activeTab] === "all"}
+				>
+					全部状态
+				</button>
+				{#each statusOptions as status}
+					<button
+						type="button"
+						on:click={() => updateSelectedStatus(status)}
+						class="btn-plain rounded-lg h-9 px-3 text-sm font-semibold active:scale-95"
+						class:bg-[var(--btn-plain-bg-hover)]={selectedStatusByTab[activeTab] === status}
+						aria-pressed={selectedStatusByTab[activeTab] === status}
+					>
+						{status}
+					</button>
+				{/each}
+			</div>
+		</div>
+
+		<div class="space-y-1.5">
+			<div class="text-75 text-sm font-semibold">排序方式</div>
+			<div class="flex flex-wrap gap-2">
+				{#each ["asc", "desc"] as order}
+					<button
+						type="button"
+						on:click={() => updateSortOrder(order as SortOrder)}
+						class="btn-plain rounded-lg h-9 px-3 text-sm font-semibold active:scale-95"
+						class:bg-[var(--btn-plain-bg-hover)]={sortOrderByTab[activeTab] === order}
+						aria-pressed={sortOrderByTab[activeTab] === order}
+					>
+						{getSortLabel(order as SortOrder)}
+					</button>
+				{/each}
+			</div>
+		</div>
+	</div>
+
 	{#if (activeTab === "game" && loadingGames) || ((activeTab === "anime" || activeTab === "manga") && loadingBangumi)}
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4" aria-label="加载骨架">
 			{#each skeletonItems as item}
@@ -203,7 +425,7 @@ onMount(() => {
 	{:else if (activeTab === "anime" || activeTab === "manga") && bangumiError && activeSource.length === 0}
 		<div class="text-sm text-red-500">{bangumiError}</div>
 	{:else if pagedCards.length === 0}
-		<div class="text-sm text-black/60 dark:text-white/60">暂无数据</div>
+		<div class="text-sm text-black/60 dark:text-white/60">暂无符合条件的数据</div>
 	{:else}
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 			{#each pagedCards as card}
