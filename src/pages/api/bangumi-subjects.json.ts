@@ -1,5 +1,5 @@
-import { agcConfig } from "@/config";
 import type { APIRoute } from "astro";
+import { agcConfig } from "@/config";
 
 export const prerender = false;
 
@@ -43,14 +43,28 @@ type AcgItem = {
 	link: string;
 };
 
-function collectionTypeToLabel(type?: number): string {
+type SubjectType = "1" | "2" | "4" | "6";
+
+function collectionTypeToLabel(
+	type: number | undefined,
+	subjectType: SubjectType,
+): string {
+	const labelMapBySubjectType: Record<SubjectType, [string, string, string]> = {
+		"1": ["想读", "读过", "在读"],
+		"2": ["想看", "看过", "在看"],
+		"4": ["想玩", "玩过", "在玩"],
+		"6": ["想看", "看过", "在看"],
+	};
+
+	const [wishLabel, doneLabel, doingLabel] = labelMapBySubjectType[subjectType];
+
 	switch (type) {
 		case 1:
-			return "想看";
+			return wishLabel;
 		case 2:
-			return "看过";
+			return doneLabel;
 		case 3:
-			return "在看";
+			return doingLabel;
 		case 4:
 			return "搁置";
 		case 5:
@@ -58,6 +72,21 @@ function collectionTypeToLabel(type?: number): string {
 		default:
 			return "收藏";
 	}
+}
+
+function baseMeta(subject: BangumiSubject) {
+	const title = subject.name_cn?.trim() || subject.name;
+	const cover =
+		subject.images?.common ||
+		subject.images?.large ||
+		subject.images?.medium ||
+		subject.images?.small;
+
+	return {
+		title,
+		cover,
+		link: `https://bgm.tv/subject/${subject.id}`,
+	};
 }
 
 function buildHeaders(): HeadersInit {
@@ -70,19 +99,21 @@ function toAnimeItem(collection: BangumiCollection): AcgItem | null {
 	const subject = collection.subject;
 	if (!subject) return null;
 
-	const title = subject.name_cn?.trim() || subject.name;
+	const { title, cover, link } = baseMeta(subject);
 	const summary = subject.short_summary?.trim() || "来自 Bangumi 动画收藏";
-	const status = `${collectionTypeToLabel(collection.type)} · ${collection.ep_status || 0}${subject.eps ? `/${subject.eps}` : ""} 话`;
+	const status = `${collectionTypeToLabel(collection.type, "2")} · ${collection.ep_status || 0}${subject.eps ? `/${subject.eps}` : ""} 话`;
 	const tags = collection.tags?.slice(0, 3).join(" / ");
 	const score = collection.rate || subject.score;
 
 	return {
 		title,
-		comment: tags ? `${summary.length > 64 ? `${summary.slice(0, 64)}...` : summary} · ${tags}` : summary,
+		comment: tags
+			? `${summary.length > 64 ? `${summary.slice(0, 64)}...` : summary} · ${tags}`
+			: summary,
 		status: score ? `${status} · 评分 ${Number(score).toFixed(1)}` : status,
 		icon: "material-symbols:live-tv-outline-rounded",
-		cover: subject.images?.common || subject.images?.large || subject.images?.medium || subject.images?.small,
-		link: `https://bgm.tv/subject/${subject.id}`,
+		cover,
+		link,
 	};
 }
 
@@ -90,10 +121,12 @@ function toBookItem(collection: BangumiCollection): AcgItem | null {
 	const subject = collection.subject;
 	if (!subject) return null;
 
-	const title = subject.name_cn?.trim() || subject.name;
+	const { title, cover, link } = baseMeta(subject);
 	const summary = subject.short_summary?.trim() || "来自 Bangumi 书籍收藏";
-	const status = `${collectionTypeToLabel(collection.type)} · ${collection.vol_status || 0}${subject.volumes ? `/${subject.volumes}` : ""} 卷`;
-	const chapterProgress = collection.ep_status ? ` · ${collection.ep_status} 章` : "";
+	const status = `${collectionTypeToLabel(collection.type, "1")} · ${collection.vol_status || 0}${subject.volumes ? `/${subject.volumes}` : ""} 卷`;
+	const chapterProgress = collection.ep_status
+		? ` · ${collection.ep_status} 章`
+		: "";
 	const score = collection.rate || subject.score;
 
 	return {
@@ -103,21 +136,77 @@ function toBookItem(collection: BangumiCollection): AcgItem | null {
 			? `${status}${chapterProgress} · 评分 ${Number(score).toFixed(1)}`
 			: `${status}${chapterProgress}`,
 		icon: "material-symbols:menu-book-outline-rounded",
-		cover: subject.images?.common || subject.images?.large || subject.images?.medium || subject.images?.small,
-		link: `https://bgm.tv/subject/${subject.id}`,
+		cover,
+		link,
 	};
 }
 
-async function fetchCollections(username: string, subjectType: "1" | "2"): Promise<BangumiCollection[]> {
+function toGameItem(collection: BangumiCollection): AcgItem | null {
+	const subject = collection.subject;
+	if (!subject) return null;
+
+	const { title, cover, link } = baseMeta(subject);
+	const summary = subject.short_summary?.trim() || "来自 Bangumi 游戏收藏";
+	const status = collectionTypeToLabel(collection.type, "4");
+	const tags = collection.tags?.slice(0, 3).join(" / ");
+	const score = collection.rate || subject.score;
+
+	return {
+		title,
+		comment: tags
+			? `${summary.length > 64 ? `${summary.slice(0, 64)}...` : summary} · ${tags}`
+			: summary,
+		status: score ? `${status} · 评分 ${Number(score).toFixed(1)}` : status,
+		icon: "material-symbols:sports-esports-outline-rounded",
+		cover,
+		link,
+	};
+}
+
+function toRealItem(collection: BangumiCollection): AcgItem | null {
+	const subject = collection.subject;
+	if (!subject) return null;
+
+	const { title, cover, link } = baseMeta(subject);
+	const summary = subject.short_summary?.trim() || "来自 Bangumi 三次元收藏";
+	const progress =
+		collection.ep_status || subject.eps
+			? `${collection.ep_status || 0}${subject.eps ? `/${subject.eps}` : ""} 集`
+			: "";
+	const status = progress
+		? `${collectionTypeToLabel(collection.type, "6")} · ${progress}`
+		: collectionTypeToLabel(collection.type, "6");
+	const tags = collection.tags?.slice(0, 3).join(" / ");
+	const score = collection.rate || subject.score;
+
+	return {
+		title,
+		comment: tags
+			? `${summary.length > 64 ? `${summary.slice(0, 64)}...` : summary} · ${tags}`
+			: summary,
+		status: score ? `${status} · 评分 ${Number(score).toFixed(1)}` : status,
+		icon: "material-symbols:theater-comedy-outline-rounded",
+		cover,
+		link,
+	};
+}
+
+async function fetchCollections(
+	username: string,
+	subjectType: SubjectType,
+): Promise<BangumiCollection[]> {
 	const params = new URLSearchParams({
 		subject_type: subjectType,
 		limit: "100",
 		offset: "0",
 	});
 
-	const response = await fetch(`https://api.bgm.tv/v0/users/${encodeURIComponent(username)}/collections?${params.toString()}`, {
-		headers: buildHeaders(),
-	});
+	const response = await fetch(
+		`https://api.bgm.tv/v0/users/${encodeURIComponent(username)}/collections?${params.toString()}`,
+		{
+			headers: buildHeaders(),
+		},
+	);
 
 	if (!response.ok) {
 		throw new Error(`Bangumi collections fetch failed: ${response.status}`);
@@ -128,21 +217,38 @@ async function fetchCollections(username: string, subjectType: "1" | "2"): Promi
 }
 
 export const GET: APIRoute = async () => {
-	const username = agcConfig.bangumiUsername?.trim() || agcConfig.bangumiUserId?.trim();
+	const username =
+		agcConfig.bangumiUsername?.trim() || agcConfig.bangumiUserId?.trim();
 
 	if (!username) {
-		return new Response(JSON.stringify({ anime: [], manga: [], error: "Bangumi username missing" }), {
-			status: 400,
-			headers: {
-				"Content-Type": "application/json; charset=utf-8",
+		return new Response(
+			JSON.stringify({
+				anime: [],
+				manga: [],
+				game: [],
+				real: [],
+				error: "Bangumi username missing",
+			}),
+			{
+				status: 400,
+				headers: {
+					"Content-Type": "application/json; charset=utf-8",
+				},
 			},
-		});
+		);
 	}
 
 	try {
-		const [animeCollections, bookCollections] = await Promise.all([
+		const [
+			animeCollections,
+			bookCollections,
+			gameCollections,
+			realCollections,
+		] = await Promise.all([
 			fetchCollections(username, "2"),
 			fetchCollections(username, "1"),
+			fetchCollections(username, "4"),
+			fetchCollections(username, "6"),
 		]);
 
 		const anime = animeCollections
@@ -153,7 +259,15 @@ export const GET: APIRoute = async () => {
 			.map(toBookItem)
 			.filter((item): item is AcgItem => item !== null);
 
-		return new Response(JSON.stringify({ anime, manga }), {
+		const game = gameCollections
+			.map(toGameItem)
+			.filter((item): item is AcgItem => item !== null);
+
+		const real = realCollections
+			.map(toRealItem)
+			.filter((item): item is AcgItem => item !== null);
+
+		return new Response(JSON.stringify({ anime, manga, game, real }), {
 			headers: {
 				"Content-Type": "application/json; charset=utf-8",
 				"Cache-Control": "no-store",
@@ -161,11 +275,20 @@ export const GET: APIRoute = async () => {
 		});
 	} catch (error) {
 		console.error("Failed to fetch Bangumi subjects:", error);
-		return new Response(JSON.stringify({ anime: [], manga: [], error: "Bangumi fetch failed" }), {
-			status: 502,
-			headers: {
-				"Content-Type": "application/json; charset=utf-8",
+		return new Response(
+			JSON.stringify({
+				anime: [],
+				manga: [],
+				game: [],
+				real: [],
+				error: "Bangumi fetch failed",
+			}),
+			{
+				status: 502,
+				headers: {
+					"Content-Type": "application/json; charset=utf-8",
+				},
 			},
-		});
+		);
 	}
 };

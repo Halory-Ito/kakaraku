@@ -11,17 +11,6 @@ type AcgCard = {
 	link?: string;
 };
 
-type GameItem = {
-	id: string;
-	name: string;
-	playtimeMinutes: number;
-	status?: string;
-	source?: "steam" | "vndb";
-	url: string;
-	coverUrl?: string;
-	iconUrl: string;
-};
-
 export let animeCards: AcgCard[] = [];
 export let mangaCards: AcgCard[] = [];
 
@@ -41,21 +30,25 @@ const tabs = [
 		label: "游戏",
 		icon: "material-symbols:sports-esports-outline-rounded",
 	},
+	{
+		key: "real",
+		label: "三次元",
+		icon: "material-symbols:theater-comedy-outline-rounded",
+	},
 ] as const;
 
 type TabKey = (typeof tabs)[number]["key"];
 type SortOrder = "asc" | "desc";
-const skeletonItems = [0, 1, 2, 3, 4, 5];
+const skeletonItems = [0, 1, 2, 3, 4, 5, 6, 7];
 
-const pageSize = 6;
+const pageSize = 8;
 let activeTab: TabKey = "anime";
 let currentPage = 1;
 
-let gameCards: AcgCard[] = [];
 let bangumiAnimeCards: AcgCard[] = [];
 let bangumiMangaCards: AcgCard[] = [];
-let loadingGames = false;
-let gameError = "";
+let bangumiGameCards: AcgCard[] = [];
+let bangumiRealCards: AcgCard[] = [];
 let loadingBangumi = false;
 let bangumiError = "";
 
@@ -63,30 +56,37 @@ let keywordByTab: Record<TabKey, string> = {
 	anime: "",
 	manga: "",
 	game: "",
+	real: "",
 };
 
 let selectedStatusByTab: Record<TabKey, string> = {
 	anime: "all",
 	manga: "all",
 	game: "all",
+	real: "all",
 };
 
 let sortOrderByTab: Record<TabKey, SortOrder> = {
 	anime: "asc",
 	manga: "asc",
 	game: "asc",
+	real: "asc",
 };
 
 $: resolvedAnimeCards =
 	bangumiAnimeCards.length > 0 ? bangumiAnimeCards : animeCards;
 $: resolvedMangaCards =
 	bangumiMangaCards.length > 0 ? bangumiMangaCards : mangaCards;
+$: resolvedGameCards = bangumiGameCards;
+$: resolvedRealCards = bangumiRealCards;
 $: activeSource =
 	activeTab === "anime"
 		? resolvedAnimeCards
 		: activeTab === "manga"
 			? resolvedMangaCards
-			: gameCards;
+			: activeTab === "game"
+				? resolvedGameCards
+				: resolvedRealCards;
 $: activeKeyword = keywordByTab[activeTab].trim().toLowerCase();
 $: activeKeywordTokens = activeKeyword.split(/\s+/).filter(Boolean);
 $: activeSelectedStatus = selectedStatusByTab[activeTab];
@@ -150,33 +150,6 @@ function updateSortOrder(value: SortOrder) {
 
 function getSortLabel(order: SortOrder): string {
 	return order === "asc" ? "标题升序" : "标题降序";
-}
-
-function playtimeToStatus(minutes: number): string {
-	if (!minutes || minutes <= 0) {
-		return "未游玩";
-	}
-
-	const hours = minutes / 60;
-	if (hours < 1) {
-		return `游玩 ${minutes} 分钟`;
-	}
-	return `游玩 ${hours.toFixed(1)} 小时`;
-}
-
-function toGameCard(game: GameItem): AcgCard {
-	const sourceIcon =
-		game.source === "vndb"
-			? "material-symbols:stadia-controller-outline-rounded"
-			: "fa6-brands:steam";
-
-	return {
-		title: game.name,
-		comment: "",
-		status: game.status || playtimeToStatus(game.playtimeMinutes),
-		icon: sourceIcon,
-		cover: game.coverUrl || game.iconUrl,
-	};
 }
 
 function getCardStatusValue(card: AcgCard): string {
@@ -258,6 +231,12 @@ function getTagClass(tag: string): string {
 		tag.includes("在看") ||
 		tag.includes("想看") ||
 		tag.includes("看过") ||
+		tag.includes("在读") ||
+		tag.includes("想读") ||
+		tag.includes("读过") ||
+		tag.includes("在玩") ||
+		tag.includes("想玩") ||
+		tag.includes("玩过") ||
 		tag.includes("搁置") ||
 		tag.includes("抛弃") ||
 		tag.includes("收藏")
@@ -267,40 +246,6 @@ function getTagClass(tag: string): string {
 
 	return "bg-[var(--primary)]/10 text-[var(--primary)]";
 }
-
-async function loadVndbGames() {
-	loadingGames = true;
-	gameError = "";
-	try {
-		const response = await fetch("/api/vndb-games.json", {
-			cache: "no-store",
-		});
-		if (!response.ok) {
-			const errData = (await response.json().catch(() => null)) as {
-				error?: string;
-			} | null;
-			throw new Error(errData?.error || `VNDB API failed: ${response.status}`);
-		}
-		const data = (await response.json()) as {
-			games: GameItem[];
-			error?: string;
-		};
-		if (data.error) {
-			throw new Error(data.error);
-		}
-		gameCards = (data.games || []).map(toGameCard);
-	} catch (error) {
-		console.error(error);
-		if (error instanceof Error) {
-			gameError = `游戏数据加载失败：${error.message}`;
-		} else {
-			gameError = "游戏数据加载失败，请确认 VNDB 配置可用。";
-		}
-	} finally {
-		loadingGames = false;
-	}
-}
-
 async function loadBangumiSubjects() {
 	loadingBangumi = true;
 	bangumiError = "";
@@ -314,19 +259,22 @@ async function loadBangumiSubjects() {
 		const data = (await response.json()) as {
 			anime: AcgCard[];
 			manga: AcgCard[];
+			game: AcgCard[];
+			real: AcgCard[];
 		};
 		bangumiAnimeCards = data.anime || [];
 		bangumiMangaCards = data.manga || [];
+		bangumiGameCards = data.game || [];
+		bangumiRealCards = data.real || [];
 	} catch (error) {
 		console.error(error);
-		bangumiError = "Bangumi 数据加载失败，已使用本地数据兜底。";
+		bangumiError = "Bangumi 数据加载失败。";
 	} finally {
 		loadingBangumi = false;
 	}
 }
 
 onMount(() => {
-	loadVndbGames();
 	loadBangumiSubjects();
 });
 </script>
@@ -404,34 +352,32 @@ onMount(() => {
 		</div>
 	</div>
 
-	{#if (activeTab === "game" && loadingGames) || ((activeTab === "anime" || activeTab === "manga") && loadingBangumi)}
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4" aria-label="加载骨架">
+	{#if loadingBangumi}
+		<div class="grid grid-cols-2 lg:grid-cols-4 gap-3" aria-label="加载骨架">
 			{#each skeletonItems as item}
-				<article class="rounded-[var(--radius-large)] border border-black/10 dark:border-white/10 bg-white/60 dark:bg-white/5 p-5 animate-pulse">
-					<div class="mb-3 rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 aspect-[3/4]"></div>
-					<div class="space-y-3">
-						<div class="h-6 w-3/4 rounded bg-black/10 dark:bg-white/10"></div>
+				<article class="rounded-[var(--radius-large)] border border-black/10 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3 md:p-3.5 animate-pulse">
+					<div class="mb-2 rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 aspect-[3/4]"></div>
+					<div class="space-y-2">
+						<div class="h-4 w-3/4 rounded bg-black/10 dark:bg-white/10"></div>
 						<div class="flex flex-wrap gap-2">
-							<div class="h-6 w-24 rounded-full bg-black/10 dark:bg-white/10"></div>
-							<div class="h-6 w-20 rounded-full bg-black/10 dark:bg-white/10"></div>
-							<div class="h-6 w-16 rounded-full bg-black/10 dark:bg-white/10"></div>
+							<div class="h-5 w-16 rounded-full bg-black/10 dark:bg-white/10"></div>
+							<div class="h-5 w-14 rounded-full bg-black/10 dark:bg-white/10"></div>
+							<div class="h-5 w-12 rounded-full bg-black/10 dark:bg-white/10"></div>
 						</div>
 					</div>
 				</article>
 			{/each}
 		</div>
-	{:else if activeTab === "game" && gameError}
-		<div class="text-sm text-red-500">{gameError}</div>
-	{:else if (activeTab === "anime" || activeTab === "manga") && bangumiError && activeSource.length === 0}
+	{:else if bangumiError && activeSource.length === 0}
 		<div class="text-sm text-red-500">{bangumiError}</div>
 	{:else if pagedCards.length === 0}
 		<div class="text-sm text-black/60 dark:text-white/60">暂无符合条件的数据</div>
 	{:else}
-		<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+		<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
 			{#each pagedCards as card}
-				<article class="rounded-[var(--radius-large)] border border-black/10 dark:border-white/10 bg-white/60 dark:bg-white/5 p-5 transition hover:shadow-md hover:-translate-y-0.5">
+				<article class="rounded-[var(--radius-large)] border border-black/10 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3 md:p-3.5 transition hover:shadow-md hover:-translate-y-0.5">
 					{#if card.cover}
-						<div class="mb-3 rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
+						<div class="mb-2 rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
 							<img
 								src={card.cover}
 								alt={`${card.title} cover`}
@@ -440,15 +386,15 @@ onMount(() => {
 							/>
 						</div>
 					{/if}
-					<div class="flex items-center justify-between mb-3 gap-3">
+					<div class="flex items-center justify-between mb-2 gap-2">
 						<div class="flex flex-col min-w-0 w-full">
 							<div class="flex items-center text-[var(--primary)] min-w-0">
 							<!-- <Icon icon={card.icon} class="text-[1.2rem] mr-2 flex-shrink-0" /> -->
-							<h3 class="font-bold text-lg text-black/80 dark:text-white/85 truncate">{card.title}</h3>
+							<h3 class="font-bold text-sm md:text-base text-black/80 dark:text-white/85 truncate">{card.title}</h3>
 							</div>
-							<div class="mt-2 flex flex-wrap gap-2">
+							<div class="mt-1.5 flex flex-wrap gap-1.5">
 								{#each card.status.split(" · ") as tag}
-									<span class={`text-xs rounded-full px-2 py-1 font-semibold whitespace-nowrap ${getTagClass(tag)}`}>{tag}</span>
+									<span class={`text-[11px] rounded-full px-1.5 py-0.5 font-semibold whitespace-nowrap ${getTagClass(tag)}`}>{tag}</span>
 								{/each}
 							</div>
 						</div>
