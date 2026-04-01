@@ -9,6 +9,7 @@ type AcgCard = {
 	icon: string;
 	cover?: string;
 	link?: string;
+	timestamp?: number;
 };
 
 export let animeCards: AcgCard[] = [];
@@ -35,6 +36,11 @@ const tabs = [
 		label: "三次元",
 		icon: "material-symbols:theater-comedy-outline-rounded",
 	},
+	{
+		key: "timeline",
+		label: "时间胶囊",
+		icon: "material-symbols:schedule-outline-rounded",
+	},
 ] as const;
 
 type TabKey = (typeof tabs)[number]["key"];
@@ -52,11 +58,19 @@ let bangumiRealCards: AcgCard[] = [];
 let loadingBangumi = false;
 let bangumiError = "";
 
+let bangumiTimelineCards: AcgCard[] = [];
+let timelineHasMore = true;
+let loadingTimeline = false;
+let timelineError = "";
+let timelineAutoLoaded = false;
+
+
 let keywordByTab: Record<TabKey, string> = {
 	anime: "",
 	manga: "",
 	game: "",
 	real: "",
+	timeline: "",
 };
 
 let selectedStatusByTab: Record<TabKey, string> = {
@@ -64,6 +78,7 @@ let selectedStatusByTab: Record<TabKey, string> = {
 	manga: "all",
 	game: "all",
 	real: "all",
+	timeline: "all",
 };
 
 let sortOrderByTab: Record<TabKey, SortOrder> = {
@@ -71,7 +86,9 @@ let sortOrderByTab: Record<TabKey, SortOrder> = {
 	manga: "asc",
 	game: "asc",
 	real: "asc",
+	timeline: "desc",
 };
+
 
 $: resolvedAnimeCards =
 	bangumiAnimeCards.length > 0 ? bangumiAnimeCards : animeCards;
@@ -79,6 +96,7 @@ $: resolvedMangaCards =
 	bangumiMangaCards.length > 0 ? bangumiMangaCards : mangaCards;
 $: resolvedGameCards = bangumiGameCards;
 $: resolvedRealCards = bangumiRealCards;
+$: resolvedTimelineCards = bangumiTimelineCards;
 $: activeSource =
 	activeTab === "anime"
 		? resolvedAnimeCards
@@ -86,11 +104,14 @@ $: activeSource =
 			? resolvedMangaCards
 			: activeTab === "game"
 				? resolvedGameCards
-				: resolvedRealCards;
+				: activeTab === "real"
+					? resolvedRealCards
+					: resolvedTimelineCards;
 $: activeKeyword = keywordByTab[activeTab].trim().toLowerCase();
 $: activeKeywordTokens = activeKeyword.split(/\s+/).filter(Boolean);
 $: activeSelectedStatus = selectedStatusByTab[activeTab];
 $: activeSortOrder = sortOrderByTab[activeTab];
+$: isTimelineTab = activeTab === "timeline";
 $: statusOptions = Array.from(
 	new Set(
 		activeSource
@@ -98,7 +119,9 @@ $: statusOptions = Array.from(
 			.filter((value) => value.length > 0),
 	),
 );
-$: filteredCards = activeSource.filter((card) => {
+$: filteredCards = isTimelineTab
+	? activeSource
+	: activeSource.filter((card) => {
 	const searchText = getCardSearchText(card);
 	const keywordMatch =
 		activeKeywordTokens.length === 0 ||
@@ -111,13 +134,20 @@ $: filteredCards = activeSource.filter((card) => {
 	return keywordMatch && statusMatch;
 });
 $: sortedCards = [...filteredCards].sort((a, b) => {
+	if (isTimelineTab) {
+		return (b.timestamp || 0) - (a.timestamp || 0);
+	}
+
 	const direction = activeSortOrder === "asc" ? 1 : -1;
 	return direction * a.title.localeCompare(b.title, "zh-Hans-CN");
 });
-$: totalPages = Math.max(1, Math.ceil(sortedCards.length / pageSize));
-$: currentPage = Math.min(currentPage, totalPages);
+$: totalPages = isTimelineTab
+	? 1
+	: Math.max(1, Math.ceil(sortedCards.length / pageSize));
+$: currentPage = isTimelineTab ? Math.max(1, currentPage) : Math.min(currentPage, totalPages);
 $: start = (currentPage - 1) * pageSize;
-$: pagedCards = sortedCards.slice(start, start + pageSize);
+$: pagedCards = isTimelineTab ? sortedCards : sortedCards.slice(start, start + pageSize);
+
 
 function switchTab(tab: TabKey) {
 	if (activeTab === tab) return;
@@ -274,6 +304,61 @@ async function loadBangumiSubjects() {
 	}
 }
 
+async function loadBangumiTimeline(reset = false) {
+	if (loadingTimeline) return;
+
+	const page = reset ? 1 : currentPage;
+	if (page < 1) return;
+	if (page > currentPage && !timelineHasMore) return;
+	const offset = (page - 1) * pageSize;
+
+	loadingTimeline = true;
+	timelineError = "";
+
+	try {
+		const response = await fetch(
+			`/api/bangumi-timeline.json?limit=${pageSize}&offset=${offset}`,
+			{ cache: "no-store" }
+		);
+		if (!response.ok) {
+			throw new Error(`Bangumi timeline API failed: ${response.status}`);
+		}
+		const data = (await response.json()) as {
+			timeline: AcgCard[];
+			hasMore: boolean;
+			offset: number;
+			error?: string;
+		};
+		if (data.error) {
+			throw new Error(data.error);
+		}
+		bangumiTimelineCards = data.timeline || [];
+		timelineHasMore = data.hasMore;
+		currentPage = page;
+	} catch (error) {
+		console.error(error);
+		timelineError = "时间胶囊加载失败。";
+	} finally {
+		loadingTimeline = false;
+	}
+}
+
+function goToTimelinePage(page: number) {
+	if (page < 1) return;
+	if (page > currentPage && !timelineHasMore) return;
+	currentPage = page;
+	loadBangumiTimeline();
+}
+
+$: if (
+	isTimelineTab &&
+	!timelineAutoLoaded &&
+	!loadingTimeline
+) {
+	timelineAutoLoaded = true;
+	loadBangumiTimeline(true);
+}
+
 onMount(() => {
 	loadBangumiSubjects();
 });
@@ -295,6 +380,7 @@ onMount(() => {
 		{/each}
 	</div>
 
+	{#if !isTimelineTab}
 	<div class="card-base mb-5 border border-[var(--line-divider)] p-4 md:p-5 space-y-4">
 		<label class="flex flex-col gap-1.5 text-sm">
 			<span class="text-75 font-semibold">关键字搜索</span>
@@ -351,81 +437,215 @@ onMount(() => {
 			</div>
 		</div>
 	</div>
-
-	{#if loadingBangumi}
-		<div class="grid grid-cols-2 lg:grid-cols-4 gap-3" aria-label="加载骨架">
-			{#each skeletonItems as item}
-				<article class="rounded-[var(--radius-large)] border border-black/10 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3 md:p-3.5 animate-pulse">
-					<div class="mb-2 rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 aspect-[3/4]"></div>
-					<div class="space-y-2">
-						<div class="h-4 w-3/4 rounded bg-black/10 dark:bg-white/10"></div>
-						<div class="flex flex-wrap gap-2">
-							<div class="h-5 w-16 rounded-full bg-black/10 dark:bg-white/10"></div>
-							<div class="h-5 w-14 rounded-full bg-black/10 dark:bg-white/10"></div>
-							<div class="h-5 w-12 rounded-full bg-black/10 dark:bg-white/10"></div>
-						</div>
-					</div>
-				</article>
-			{/each}
-		</div>
-	{:else if bangumiError && activeSource.length === 0}
-		<div class="text-sm text-red-500">{bangumiError}</div>
-	{:else if pagedCards.length === 0}
-		<div class="text-sm text-black/60 dark:text-white/60">暂无符合条件的数据</div>
-	{:else}
-		<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-			{#each pagedCards as card}
-				<article class="rounded-[var(--radius-large)] border border-black/10 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3 md:p-3.5 transition hover:shadow-md hover:-translate-y-0.5">
-					{#if card.cover}
-						<div class="mb-2 rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
-							<img
-								src={card.cover}
-								alt={`${card.title} cover`}
-								class="w-full aspect-[3/4] object-cover bg-black/10 dark:bg-white/10"
-								loading="lazy"
-							/>
-						</div>
-					{/if}
-					<div class="flex items-center justify-between mb-2 gap-2">
-						<div class="flex flex-col min-w-0 w-full">
-							<div class="flex items-center text-[var(--primary)] min-w-0">
-							<!-- <Icon icon={card.icon} class="text-[1.2rem] mr-2 flex-shrink-0" /> -->
-							<h3 class="font-bold text-sm md:text-base text-black/80 dark:text-white/85 truncate">{card.title}</h3>
-							</div>
-							<div class="mt-1.5 flex flex-wrap gap-1.5">
-								{#each card.status.split(" · ") as tag}
-									<span class={`text-[11px] rounded-full px-1.5 py-0.5 font-semibold whitespace-nowrap ${getTagClass(tag)}`}>{tag}</span>
-								{/each}
-							</div>
-						</div>
-					</div>
-				</article>
-			{/each}
-		</div>
 	{/if}
 
-	{#if totalPages > 1}
-		<div class="mt-5 flex items-center justify-center gap-2 flex-wrap">
-			<button type="button" class="btn-plain rounded-lg h-9 px-3 text-sm font-semibold" on:click={() => goToPage(currentPage - 1)} disabled={currentPage <= 1}>
-				上一页
-			</button>
-
-			{#each Array(totalPages) as _, index}
-				{@const page = index + 1}
+	{#if isTimelineTab}
+		{#if loadingTimeline && bangumiTimelineCards.length === 0}
+			<div class="space-y-4" aria-label="加载骨架">
+				{#each skeletonItems.slice(0, 5) as item}
+					<article class="rounded-[var(--radius-large)] border border-black/10 dark:border-white/10 bg-white/60 dark:bg-white/5 p-4 animate-pulse">
+						<div class="flex gap-4">
+							<div class="w-16 h-20 rounded-lg bg-black/10 dark:bg-white/10 flex-shrink-0"></div>
+							<div class="flex-1 space-y-2">
+								<div class="h-5 w-1/3 rounded bg-black/10 dark:bg-white/10"></div>
+								<div class="h-4 w-2/3 rounded bg-black/10 dark:bg-white/10"></div>
+								<div class="flex gap-2 mt-2">
+									<div class="h-5 w-16 rounded-full bg-black/10 dark:bg-white/10"></div>
+									<div class="h-5 w-20 rounded-full bg-black/10 dark:bg-white/10"></div>
+								</div>
+							</div>
+						</div>
+					</article>
+				{/each}
+			</div>
+		{:else if timelineError && bangumiTimelineCards.length === 0}
+			<div class="space-y-3">
+				<div class="text-sm text-red-500">{timelineError}</div>
 				<button
 					type="button"
-					on:click={() => goToPage(page)}
-					class="btn-plain rounded-lg h-9 min-w-9 px-3 text-sm font-semibold"
-					class:bg-[var(--btn-plain-bg-hover)]={page === currentPage}
-					aria-current={page === currentPage ? "page" : undefined}
+					class="btn-plain rounded-lg h-10 px-4 text-sm font-semibold active:scale-95 transition"
+					on:click={() => loadBangumiTimeline()}
 				>
-					{page}
+					重试加载
 				</button>
-			{/each}
+			</div>
+		{:else if pagedCards.length === 0}
+			<div class="text-sm text-black/60 dark:text-white/60">暂无时间胶囊数据</div>
+		{:else}
+			<div class="space-y-3">
+				{#each pagedCards as card, index}
+					{@const delay = Math.min(index * 50, 200)}
+					<article
+						class="group rounded-[var(--radius-large)] border border-black/10 dark:border-white/10 bg-white/60 dark:bg-white/5 p-4 transition hover:shadow-md hover:border-[var(--primary)]/30 hover:-translate-y-0.5 opacity-0 animate-fade-in"
+						style="animation-delay: {delay}ms; animation-fill-mode: forwards;"
+					>
+						<div class="flex gap-4">
+							{#if card.cover}
+								<a
+									href={card.link || '#'}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="flex-shrink-0 block rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 transition hover:scale-105"
+								>
+									<img
+										src={card.cover}
+										alt={`${card.title} cover`}
+										class="w-16 h-20 object-cover"
+										loading="lazy"
+									/>
+								</a>
+							{/if}
+							<div class="flex-1 min-w-0">
+								<div class="flex items-start justify-between gap-2">
+									<div class="min-w-0">
+										{#if card.link}
+											<a
+												href={card.link}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="font-bold text-base text-[var(--primary)] hover:underline truncate block"
+											>
+												{card.title}
+											</a>
+										{:else}
+											<h3 class="font-bold text-base text-black/80 dark:text-white/85 truncate">
+												{card.title}
+											</h3>
+										{/if}
+									</div>
+									<Icon icon={card.icon} class="text-[1.2rem] text-black/30 dark:text-white/30 flex-shrink-0 mt-0.5" />
+								</div>
+								{#if card.comment}
+									<p class="mt-1.5 text-sm text-black/60 dark:text-white/60 line-clamp-2 leading-relaxed">
+										{card.comment}
+									</p>
+								{/if}
+								<div class="mt-2.5 flex flex-wrap gap-1.5">
+									{#each card.status.split(" · ") as tag}
+										<span class={`text-[11px] rounded-full px-2 py-0.5 font-semibold whitespace-nowrap ${getTagClass(tag)}`}>
+											{tag}
+										</span>
+									{/each}
+								</div>
+							</div>
+						</div>
+					</article>
+				{/each}
+			</div>
 
-			<button type="button" class="btn-plain rounded-lg h-9 px-3 text-sm font-semibold" on:click={() => goToPage(currentPage + 1)} disabled={currentPage >= totalPages}>
-				下一页
-			</button>
-		</div>
+			{#if timelineError}
+				<div class="mt-4 flex items-center justify-center gap-3 text-sm text-red-500">
+					<span>{timelineError}</span>
+					<button
+						type="button"
+						class="btn-plain rounded-lg h-9 px-3 text-sm font-semibold active:scale-95 transition"
+						on:click={() => loadBangumiTimeline()}
+					>
+						重试
+					</button>
+				</div>
+			{/if}
+
+			<div class="mt-5 flex items-center justify-center gap-2 flex-wrap">
+				<button
+					type="button"
+					class="btn-plain rounded-lg h-9 px-3 text-sm font-semibold"
+					on:click={() => goToTimelinePage(currentPage - 1)}
+					disabled={currentPage <= 1 || loadingTimeline}
+				>
+					上一页
+				</button>
+
+				<span class="text-sm text-black/60 dark:text-white/60 min-w-20 text-center">
+					第 {currentPage} 页
+				</span>
+
+				<button
+					type="button"
+					class="btn-plain rounded-lg h-9 px-3 text-sm font-semibold"
+					on:click={() => goToTimelinePage(currentPage + 1)}
+					disabled={!timelineHasMore || loadingTimeline}
+				>
+					下一页
+				</button>
+			</div>
+		{/if}
+	{:else}
+		{#if loadingBangumi}
+			<div class="grid grid-cols-2 lg:grid-cols-4 gap-3" aria-label="加载骨架">
+				{#each skeletonItems as item}
+					<article class="rounded-[var(--radius-large)] border border-black/10 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3 md:p-3.5 animate-pulse">
+						<div class="mb-2 rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 aspect-[3/4]"></div>
+						<div class="space-y-2">
+							<div class="h-4 w-3/4 rounded bg-black/10 dark:bg-white/10"></div>
+							<div class="flex flex-wrap gap-2">
+								<div class="h-5 w-16 rounded-full bg-black/10 dark:bg-white/10"></div>
+								<div class="h-5 w-14 rounded-full bg-black/10 dark:bg-white/10"></div>
+								<div class="h-5 w-12 rounded-full bg-black/10 dark:bg-white/10"></div>
+							</div>
+						</div>
+					</article>
+				{/each}
+			</div>
+		{:else if bangumiError && activeSource.length === 0}
+			<div class="text-sm text-red-500">{bangumiError}</div>
+		{:else if pagedCards.length === 0}
+			<div class="text-sm text-black/60 dark:text-white/60">暂无符合条件的数据</div>
+		{:else}
+			<div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+				{#each pagedCards as card}
+					<article class="rounded-[var(--radius-large)] border border-black/10 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3 md:p-3.5 transition hover:shadow-md hover:-translate-y-0.5">
+						{#if card.cover}
+							<div class="mb-2 rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
+								<img
+									src={card.cover}
+									alt={`${card.title} cover`}
+									class="w-full aspect-[3/4] object-cover bg-black/10 dark:bg-white/10"
+									loading="lazy"
+								/>
+							</div>
+						{/if}
+						<div class="flex items-center justify-between mb-2 gap-2">
+							<div class="flex flex-col min-w-0 w-full">
+								<div class="flex items-center text-[var(--primary)] min-w-0">
+								<!-- <Icon icon={card.icon} class="text-[1.2rem] mr-2 flex-shrink-0" /> -->
+								<h3 class="font-bold text-sm md:text-base text-black/80 dark:text-white/85 truncate">{card.title}</h3>
+								</div>
+								<div class="mt-1.5 flex flex-wrap gap-1.5">
+									{#each card.status.split(" · ") as tag}
+										<span class={`text-[11px] rounded-full px-1.5 py-0.5 font-semibold whitespace-nowrap ${getTagClass(tag)}`}>{tag}</span>
+									{/each}
+								</div>
+							</div>
+						</div>
+					</article>
+				{/each}
+			</div>
+		{/if}
+
+		{#if totalPages > 1}
+			<div class="mt-5 flex items-center justify-center gap-2 flex-wrap">
+				<button type="button" class="btn-plain rounded-lg h-9 px-3 text-sm font-semibold" on:click={() => goToPage(currentPage - 1)} disabled={currentPage <= 1}>
+					上一页
+				</button>
+
+				{#each Array(totalPages) as _, index}
+					{@const page = index + 1}
+					<button
+						type="button"
+						on:click={() => goToPage(page)}
+						class="btn-plain rounded-lg h-9 min-w-9 px-3 text-sm font-semibold"
+						class:bg-[var(--btn-plain-bg-hover)]={page === currentPage}
+						aria-current={page === currentPage ? "page" : undefined}
+					>
+						{page}
+					</button>
+				{/each}
+
+				<button type="button" class="btn-plain rounded-lg h-9 px-3 text-sm font-semibold" on:click={() => goToPage(currentPage + 1)} disabled={currentPage >= totalPages}>
+					下一页
+				</button>
+			</div>
+		{/if}
 	{/if}
 </div>
