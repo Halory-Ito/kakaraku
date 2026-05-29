@@ -72,7 +72,7 @@ export const navBarConfig: NavBarConfig = {
 };
 
 export const profileConfig: ProfileConfig = {
-	avatar: "assets/images/avatar.png", // Relative to the /src directory. Relative to the /public directory if it starts with '/'
+	avatar: "https://cloudflare.halory.fun/avatar.png", // Relative to the /src directory. Relative to the /public directory if it starts with '/'
 	name: "Karaku",
 	bio: "这个人很懒，什么都没有留下~",
 	links: [
