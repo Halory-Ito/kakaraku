@@ -2,6 +2,7 @@ import sitemap from "@astrojs/sitemap";
 import svelte from "@astrojs/svelte";
 import tailwind from "@astrojs/tailwind";
 import netlify from "@astrojs/netlify";
+import cloudflare from "@astrojs/cloudflare";
 import { pluginCollapsibleSections } from "@expressive-code/plugin-collapsible-sections";
 import { pluginLineNumbers } from "@expressive-code/plugin-line-numbers";
 import swup from "@swup/astro";
@@ -27,10 +28,11 @@ import { pluginCustomCopyButton } from "./src/plugins/expressive-code/custom-cop
 
 // https://astro.build/config
 export default defineConfig({
-	site: "https://kakaraku.netlify.app/",
+	site: process.env.CF_PAGES ? "https://page.halory.fun/" : "https://kakaraku.netlify.app/",
 	base: "/",
 	trailingSlash: "always",
-	adapter: netlify(),
+	output: "hybrid",
+	adapter: process.env.CF_PAGES ? cloudflare({ mode: "directory" }) : netlify(),
 	integrations: [
 		tailwind({
 			nesting: true,
