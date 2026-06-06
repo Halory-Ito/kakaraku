@@ -76,7 +76,7 @@ function stripHtml(input: string): string {
 }
 
 function extractFirstSubjectLink(html: string): string | undefined {
-	const match = html.match(/href="(https?:\/\/bgm\.tv\/subject\/\d+)"/i);
+	const match = html.match(/href="(https?:\/\/bangumi\.one\/subject\/\d+)"/i);
 	return match?.[1];
 }
 
@@ -181,7 +181,7 @@ async function fetchTimeline(
 	limit: number = 30,
 	offset: number = 0,
 ): Promise<BangumiTimelineItem[]> {
-	const requestUrl = `https://bgm.tv/feed/user/${encodeURIComponent(username)}/timeline`;
+	const requestUrl = `${agcConfig.baseUrl}/feed/user/${encodeURIComponent(username)}/timeline`;
 
 	let lastError: unknown;
 

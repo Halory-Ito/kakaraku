@@ -85,7 +85,7 @@ function baseMeta(subject: BangumiSubject) {
 	return {
 		title,
 		cover,
-		link: `https://bgm.tv/subject/${subject.id}`,
+		link: `${agcConfig.baseUrl}/subject/${subject.id}`,
 	};
 }
 
@@ -202,7 +202,7 @@ async function fetchCollections(
 	});
 
 	const response = await fetch(
-		`https://api.bgm.tv/v0/users/${encodeURIComponent(username)}/collections?${params.toString()}`,
+		`${agcConfig.apiUrl}/v0/users/${encodeURIComponent(username)}/collections?${params.toString()}`,
 		{
 			headers: buildHeaders(),
 		},

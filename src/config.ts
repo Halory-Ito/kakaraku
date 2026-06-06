@@ -122,4 +122,6 @@ export const agcConfig = {
 	vndbUserId: "u335444",
 	bangumiUserId: "1077797", // bangumi的其他数据需要用
 	bangumiUsername: "karaku", // bangumi的时间胶囊RSS订阅需要
+	apiUrl:"https://api.bangumi.one",
+	baseUrl:"https://bangumi.one",
 };
